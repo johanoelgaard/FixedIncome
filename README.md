@@ -1,2 +1,2 @@
 # FixedIncome
-Fixed Income Derivatives, University of Copenhagen, Fall 2023
+Fixed Income Derivatives, University of Copenhagen, Fall 2024
