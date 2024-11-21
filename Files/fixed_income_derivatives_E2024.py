@@ -6,44 +6,24 @@ from numpy.polynomial.hermite import hermfit, hermval, hermder
 import copy
 
 # Conversions between ZCB prices, spot rates forward rates and libor rates
-def zcb_prices_from_spot_rates(T,spot_rate):
-    """ Calculate the zero-coupon bond prices from the spot rates using p(t,T) = exp(-R(t,T)*(T-t))
-    
-    Arguments:
-    T: array-like, time to maturity of the zero-coupon bonds
-    spot_rate: array-like, spot rates
-
-    Returns:
-    p: array-like, zero-coupon bond prices
-    """
-
+def zcb_prices_from_spot_rates(T,R):
     M = len(T)
     p = np.zeros([M])
     for i in range(0,M):
         if T[i] < 1e-8:
             p[i] = 1
         else:
-            p[i] = np.exp(-spot_rate[i]*T[i])
+            p[i] = np.exp(-R[i]*T[i])
     return p
 
-def spot_rates_from_zcb_prices(T,zcb_price):
-    """ Calculate tthe spot rates from the zero-coupon bond prices using R(t,T) = - log(p(t,T))/(T-t)
-    
-    Arguments:
-    T: array-like, time to maturity of the zero-coupon bonds
-    zcp_prices: array-like, zcb prices
-
-    Returns:
-    r: array-like, spot rates
-    """
-
+def spot_rates_from_zcb_prices(T,p):
     M = len(T)
     r = np.zeros([M])
     for i in range(0,M):
         if T[i] < 1e-12:
             r[i] = np.nan
         else:
-            r[i] = -np.log(zcb_price[i])/T[i]
+            r[i] = -np.log(p[i])/T[i]
     return r
 
 def forward_rates_from_zcb_prices(T,p,horizon = 1):
@@ -72,6 +52,63 @@ def forward_libor_rates_from_zcb_prices(T,p,horizon = 1):
         f[i] = (p[i-horizon]-p[i])/(p[i]*(T[i]-T[i-horizon]))
         i += 1
     return f
+
+def accrual_factor_from_zcb_prices(t,T_n,T_N,fixed_freq,T,p):
+    T_fix = []
+    if type(fixed_freq) == str:
+        if fixed_freq == "quarterly":
+            for i in range(1,int((T_N-T_n)*4) + 1):
+                if T_n + i*0.25 > t:
+                    T_fix.append(T_n + i*0.25)
+        elif fixed_freq == "semiannual":
+            for i in range(1,int((T_N-T_n)*2) + 1):
+                if T_n + i*0.5 > t:
+                    T_fix.append(T_n + i*0.5)
+        elif fixed_freq == "annual":
+            for i in range(1,int(T_N-T_n) + 1):
+                if T_n + i > t:
+                    T_fix.append(T_n + i)
+    elif type(fixed_freq) == int or type(fixed_freq) == float or type(fixed_freq) == np.int32 or type(fixed_freq) == np.float64:
+        for i in range(1,int((T_N-T_n)/fixed_freq) + 1):
+            if T_n + i*fixed_freq > t:
+                T_fix.append(T_n + i*fixed_freq)
+    p_fix = np.array(for_values_in_list_find_value_return_value(T_fix,T,p))
+    T_fix = np.array(T_fix)
+    S = (T_fix[0] - t)*p_fix[0]
+    for i in range(1,len(T_fix)):
+        S += (T_fix[i] - T_fix[i-1])*p_fix[i]
+    return S
+
+def swap_rate_from_zcb_prices(t,T_n,T_N,fixed_freq,T,p,float_freq = 0,L = 0):
+    S = accrual_factor_from_zcb_prices(t,T_n,T_N,fixed_freq,T,p)
+    if t <= T_n:
+        [p_n,p_N] = for_values_in_list_find_value_return_value([T_n,T_N],T,p)
+        R = (p_n-p_N)/S
+    elif t > T_n:
+        if float_freq == 0:
+            print(f"WARNING! Since t is after inception, 'float_freq' must be given as an argument")
+            R = np.nan
+        else:
+            if type(float_freq) == str:
+                if float_freq == "quarterly":
+                    float_freq = 0.25
+                elif float_freq == "semiannual":
+                    float_freq = 0.5
+                elif fixed_freq == "annual":
+                    float_freq = 1
+            i, I_done = 0, False
+            while I_done == False and i*float_freq < T_N:
+                if i*float_freq >= t:
+                    T_n = i*float_freq
+                    I_done = True
+                i += 1
+            if I_done == True:
+                [p_n,p_N] = for_values_in_list_find_value_return_value([T_n,T_N],T,p)
+                R = (((T_n-t)*L+1)*p_n-p_N)/S
+            else:
+                print(f"WARNING! Not able to compute the par swap rate")
+                R = np.nan
+    return R, S
 
 #  Fixed rate bond
 def macauley_duration(pv,T,C,ytm):
@@ -224,7 +261,7 @@ def stdev_cir(r0,a,b,sigma,T):
     return stdev
 
 def ci_cir(r0,a,b,sigma,T,size_ci,type_ci = "two_sided"):
-    if type(T) == int or type(T) == float:
+    if type(T) == int or type(T) == float or type(T) == np.float64:
         if type_ci == "lower":
             if T < 1e-6:
                 lb, ub = np.nan, np.nan
@@ -324,7 +361,7 @@ def simul_cir(r0,a,b,sigma,M,T,method = "exact"):
 
 # Vasicek short rate model
 def zcb_price_vasicek(r0,a,b,sigma,T):
-    if type(T) == int or type(T) == float or type(T) == np.float64:
+    if type(T) == int or type(T) == float or type(T) == np.int32 or type(T) == np.float64:
         B = (1/a)*(1-np.exp(-a*T))
         A = (B-T)*(a*b-0.5*sigma**2)/(a**2)-(sigma**2*B**2)/(4*a)
         p = np.exp(A-r0*B)
@@ -341,7 +378,7 @@ def zcb_price_vasicek(r0,a,b,sigma,T):
     return p
 
 def spot_rate_vasicek(r0,a,b,sigma,T):
-    if type(T) == int or type(T) == float or type(T) == np.float64:
+    if type(T) == int or type(T) == float or type(T) == np.int32 or type(T) == np.float64:
         B = (1/a)*(1-np.exp(-a*T))
         A = (B-T)*(a*b-0.5*sigma**2)/(a**2)-(sigma**2*B)/(4*a)
         if T < 1e-6:
@@ -364,7 +401,7 @@ def spot_rate_vasicek(r0,a,b,sigma,T):
     return r
 
 def forward_rate_vasicek(r0,a,b,sigma,T):
-    if type(T) == int or type(T) == float or type(T) == np.float64:
+    if type(T) == int or type(T) == float or type(T) == np.int32 or type(T) == np.float64:
         B = (1/a)*(1-np.exp(-a*T))
         B_T = np.exp(-a*T)
         if T < 1e-6:
@@ -401,7 +438,7 @@ def stdev_vasicek(r0,a,b,sigma,T):
     return std
 
 def ci_vasicek(r0,a,b,sigma,T,size_ci,type_ci = "two_sided"):
-    if type(T) == int or type(T) == float:
+    if type(T) == int or type(T) == float or type(T) == np.int32 or type(T) == np.float64:
         if type_ci == "lower":
             z = norm.ppf(size_ci,0,1)
             if T < 1e-10:
@@ -474,7 +511,9 @@ def ci_vasicek(r0,a,b,sigma,T,size_ci,type_ci = "two_sided"):
         lb,ub = False, False
     return lb, ub
 
-def simul_vasicek(r0,a,b,sigma,M,T,method = "exact"):
+def simul_vasicek(r0,a,b,sigma,M,T,method = "exact",seed = None):
+    if seed is not None:
+        np.random.seed(seed)
     delta = T/M
     r = np.zeros([M+1])
     r[0] = r0
@@ -488,12 +527,64 @@ def simul_vasicek(r0,a,b,sigma,M,T,method = "exact"):
             r[m] = r[m-1] + (b-a*r[m-1])*delta + sigma*delta_sqrt*Z[m-1]
     return r
 
+def euro_option_price_vasicek(K,T1,T2,p_T1,p_T2,a,sigma,type = "call"):
+    sigma_p = (sigma/a)*(1-np.exp(-a*(T2-T1)))*np.sqrt((1-np.exp(-2*a*T1))/(2*a))
+    d1 = (np.log(p_T2/(p_T1*K)))/sigma_p + 0.5*sigma_p
+    d2 = d1 - sigma_p
+    if type == "call":
+        price = p_T2*ndtr(d1) - p_T1*K*ndtr(d2)
+    elif type == "put":
+        price = p_T1*K*ndtr(-d2) - p_T2*ndtr(-d1)
+    return price
+
+def caplet_prices_vasicek(sigma,strike,a,T,p):
+    price_caplet = np.zeros([len(T)])
+    for i in range(2,len(T)):
+        price_caplet[i] = (1 + (T[i]-T[i-1])*strike)*euro_option_price_vasicek(1/(1 + (T[i]-T[i-1])*strike),T[i-1],T[i],p[i-1],p[i],a,sigma,type = "put")
+    return price_caplet
+
+def fit_vasicek_obj(param,R_star,T,scaling = 1):
+    r0, a, b, sigma = param
+    M = len(T)
+    R_fit = spot_rate_vasicek(r0,a,b,sigma,T)
+    y = 0
+    for m in range(0,M):
+        y += scaling*(R_fit[m] - R_star[m])**2
+    return y
+
+def fit_vasicek_no_sigma_obj(param,sigma,R_star,T,scaling = 1):
+    r0, a, b = param
+    M = len(T)
+    R_fit = spot_rate_vasicek(r0,a,b,sigma,T)
+    y = 0
+    for m in range(0,M):
+        y += scaling*(R_fit[m] - R_star[m])**2
+    return y
+
+def fit_cir_obj(param,R_star,T,scaling = 1):
+    r0, a, b, sigma = param
+    M = len(T)
+    R_fit = spot_rate_cir(r0,a,b,sigma,T)
+    y = 0
+    for m in range(0,M):
+        y += scaling*(R_fit[m] - R_star[m])**2
+    return y
+
+def fit_cir_no_sigma_obj(param,sigma,R_star,T,scaling = 1):
+    r0, a, b = param
+    M = len(T)
+    R_fit = spot_rate_cir(r0,a,b,sigma,T)
+    y = 0
+    for m in range(0,M):
+        y += scaling*(R_fit[m] - R_star[m])**2
+    return y
+
 # Fitting the initial term structure of forward rates (For use in the Ho-Lee and Hull-White extended Vasicek models)
 def theta(t,sigma,args):
     if args["method"] == "nelson-siegel":
         a = args["a"]
         b = args["b"]
-        if type(t) == int or type(t) == float or type(t) == np.float64:
+        if type(t) == int or type(t) == float or type(t) == np.int32 or type(t) == np.float64:
             K = len(a)
             theta = -a[0]*b[0]*np.exp(-b[0]*t) + sigma**2*t
             for k in range(1,K):
@@ -688,11 +779,11 @@ def black_caplet_theta(sigma,T,r,R,alpha,p,L,type = "call"):
         theta = r*price - alpha*p*(sigma*L*norm.pdf(d1))/(2*np.sqrt(T))
     return theta
 
-def black_swaption_iv(C,T,K,S,R,type = "call", iv0 = 0.2, max_iter = 1000, prec = 1.0e-10):
+def black_caplet_iv(C,T,R,alpha,p,L, iv0 = 0.2, max_iter = 200, prec = 1.0e-5):
     iv = iv0
     for i in range(0,max_iter):
-        price = black_swaption_price(iv,T,K,S,R,type = "call")
-        vega = black_swaption_vega(iv,T,K,S,R,type = "call")
+        price = black_caplet_price(iv,T,R,alpha,p,L,type = "call")
+        vega = black_caplet_vega(iv,T,R,alpha,p,L,type = "call")
         diff = C - price
         if abs(diff) < prec:
             return iv
@@ -738,6 +829,17 @@ def black_swaption_theta(sigma,T,K,S,r,R,type = "call"):
         price = S*(R*ndtr(d1) - K*ndtr(d2))
         theta = r*price - S*R*sigma*norm.pdf(d1)/(2*np.sqrt(T))
     return theta
+
+def black_swaption_iv(C,T,K,S,R,type = "call", iv0 = 0.2, max_iter = 1000, prec = 1.0e-10):
+    iv = iv0
+    for i in range(0,max_iter):
+        price = black_swaption_price(iv,T,K,S,R,type = "call")
+        vega = black_swaption_vega(iv,T,K,S,R,type = "call")
+        diff = C - price
+        if abs(diff) < prec:
+            return iv
+        iv += diff/vega
+    return iv
 
 # SABR model
 def sigma_sabr(K,T,F_0,sigma_0,beta,upsilon,rho,type = "call"):
