@@ -561,24 +561,6 @@ def fit_vasicek_no_sigma_obj(param,sigma,R_star,T,scaling = 1):
         y += scaling*(R_fit[m] - R_star[m])**2
     return y
 
-def fit_cir_obj(param,R_star,T,scaling = 1):
-    r0, a, b, sigma = param
-    M = len(T)
-    R_fit = spot_rate_cir(r0,a,b,sigma,T)
-    y = 0
-    for m in range(0,M):
-        y += scaling*(R_fit[m] - R_star[m])**2
-    return y
-
-def fit_cir_no_sigma_obj(param,sigma,R_star,T,scaling = 1):
-    r0, a, b = param
-    M = len(T)
-    R_fit = spot_rate_cir(r0,a,b,sigma,T)
-    y = 0
-    for m in range(0,M):
-        y += scaling*(R_fit[m] - R_star[m])**2
-    return y
-
 # Fitting the initial term structure of forward rates (For use in the Ho-Lee and Hull-White extended Vasicek models)
 def theta(t,sigma,args):
     if args["method"] == "nelson-siegel":
@@ -1214,3 +1196,22 @@ def value_in_list_of_dict_returns_I_idx(value,L,name):
             output = True, item
             break
     return output
+
+
+def fit_cir_obj(param,R_star,T,scaling = 1):
+    r0, a, b, sigma = param
+    M = len(T)
+    R_fit = spot_rate_cir(r0,a,b,sigma,T)
+    y = 0
+    for m in range(0,M):
+        y += scaling*(R_fit[m] - R_star[m])**2
+    return y
+
+def fit_cir_no_sigma_obj(param,sigma,R_star,T,scaling = 1):
+    r0, a, b = param
+    M = len(T)
+    R_fit = spot_rate_cir(r0,a,b,sigma,T)
+    y = 0
+    for m in range(0,M):
+        y += scaling*(R_fit[m] - R_star[m])**2
+    return y
