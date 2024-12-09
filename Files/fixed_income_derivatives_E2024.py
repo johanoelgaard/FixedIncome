@@ -848,58 +848,76 @@ def simul_lmm(L0,T,sigma,rho,M):
     log_L_simul = np.nan*np.ones([N,M+1])
     log_L_simul[:,0] = np.log(L0)
     stage = 0
-    Mpp = int(M/N)
+    Mps = int(M/N)
     while stage < N:
-        Z = np.random.standard_normal([M,N-stage])
+        Z = np.random.standard_normal([N-stage,Mps])
         rho_sqrt = np.real(sqrtm(rho[stage:N,stage:N]))
-        for m in range(0,Mpp):
-            drift = drift_lmm(log_L_simul[stage:N,stage*Mpp+m],alpha[stage:N],sigma[stage:N],rho[stage:N,stage:N])
-            log_L_simul[stage:N,stage*Mpp+m+1] = log_L_simul[stage:N,stage*Mpp+m] - (0.5*sigma[stage:N]**2 + drift)*delta + delta_sqrt*sigma[stage:N]*np.matmul(rho_sqrt,Z[m,:])
+        for m in range(0,Mps):
+            drift = drift_lmm(log_L_simul[stage:N,stage*Mps+m],alpha[stage:N],sigma[stage:N],rho[stage:N,stage:N])
+            log_L_simul[stage:N,stage*Mps+m+1] = log_L_simul[stage:N,stage*Mps+m] - (0.5*sigma[stage:N]**2 + drift)*delta + delta_sqrt*sigma[stage:N]*np.matmul(rho_sqrt,Z[:,m])
         stage += 1
     return np.exp(log_L_simul)
 
-# def p_matrix_construct(alpha,R):
-#     # print(f"inside matrix construct")
-#     # print(R)
-#     N = len(R)
-#     M = np.zeros([N,N])
-#     for c in range(0,N):
-#         M[0,c] = R[0]*alpha[c]
-#     M[0,-1] += 1
-#     for r in range(1,N):
-#         M[r,r-1] = -1
-#         for c in range(r,N):
-#             M[r,c] = R[r]*alpha[c]
-#         M[r,-1] += 1
-#     # print(f"Matrix done")
-#     # print(M)
-#     return M
-#
-# def simul_smm(R0,T,sigma,rho,M):
-#     print(f"inside simul_smm")
-#     N = len(R0) - 1
-#     alpha = np.zeros(N+1)
-#     for n in range(1,N+2):
-#         alpha[n-1] = T[n] - T[n-1]
-#     delta = T[1]*4/M
-#     delta_sqrt = np.sqrt(delta)
-#     R_simul = np.nan*np.ones([N+1,M+1])
-#     R_simul[:,0] = R0
-#     stage = 0
-#     Mpp = int(M/N)
-#     while stage < 1:
-#         m = 0
-#         p_matrix = p_matrix_construct(alpha[stage:],R_simul[stage:,stage*Mpp+m])
-#         y = np.zeros([N+1-stage])
-#         y[0] = 1
-#         p = np.linalg.solve(p_matrix,y)
-#         L = (1-p[0])/(alpha[stage]*p[0])
-#         drift = 1
-#         stage += 1
-#     return True
-#
-# def drift_smm(p,alpha,R,sigma):
-#     return True
+def simul_smm(R0,T,sigma,rho,M,type = "regular"):
+    N = len(R0) - 1
+    delta = T[1]*(N+1)/M
+    delta_sqrt = np.sqrt(delta)
+    alpha = np.zeros(N+1)
+    for n in range(1,N+2):
+        alpha[n-1] = T[n] - T[n-1]
+    rho_sqrt = np.real(sqrtm(rho))
+    sigma = np.matmul(np.diag(sigma),rho_sqrt)
+    R_simul = np.nan*np.ones([N+1,M+1])
+    R_simul[:,0] = R0
+    stage = 0
+    Mps = int(M/(N+1))
+    # print(R0,T,sigma,rho,M,delta,alpha,Mps)
+    while stage < N+1:
+        Z = np.random.standard_normal([N+1-stage,Mps])
+        rho_sqrt = np.real(sqrtm(rho[stage:,stage:]))
+        # print(f"stage; {stage}")
+        # print(rho_sqrt)
+        for m in range(1,Mps+1):
+            t = delta*(stage*Mps + m - 1)
+            alpha[stage] = T[stage+1] - t
+            drift = drift_smm(R_simul[stage:,stage*Mps],sigma[stage:,stage:],alpha[stage:])
+            # print(f"    stage: {stage}, m: {m}, t: {t}, alpha: {alpha}")
+            R_simul[stage:,stage*Mps + m] = R_simul[stage:,stage*Mps + m-1] + drift*R_simul[stage:,stage*Mps + m-1]*delta + delta_sqrt*R_simul[stage:,stage*Mps + m-1]*np.matmul(sigma[stage:,stage:],Z[:,m-1])
+        stage += 1
+    return R_simul
+
+def matrix_smm(alpha,R):
+    N = len(R)
+    M = np.zeros([N,N])
+    for c in range(0,N):
+        M[0,c] = R[0]*alpha[c]
+    M[0,-1] += 1
+    for r in range(1,N):
+        M[r,r-1] = -1
+        for c in range(r,N):
+            M[r,c] = R[r]*alpha[c]
+        M[r,-1] += 1
+    return M
+
+def drift_smm(R,sigma,alpha):
+    N = len(R) - 1
+    drift = np.zeros([N+1])
+    X = matrix_smm(alpha,R)
+    y = np.zeros([N+1])
+    y[0] = 1
+    p = np.linalg.solve(X,y)
+    S = np.zeros(N+1)
+    for n in range(0,N+1):
+        for j in range(0,N+1-n):
+            S[n] += alpha[j]*p[j]
+    phi = np.zeros([N,N+1])
+    for n in range(0,N):
+        for j in range(0,N-1):
+            phi[n,:] += S[j+1]/S[n]*alpha[j+1]*R[j+1]*sigma[j+1,:]
+            for k in range(n+1,j+1):
+                phi[n] *= (1 + alpha[k]*R[k])
+        drift[n] = - np.dot(sigma[n,:],phi[n,:])
+    return drift
 
 # Nelson-Siegel function
 def F_ns(param,T):
@@ -1060,10 +1078,10 @@ def black_swaption_price(sigma,T,K,S,R,type = "call"):
 
 def black_swaption_delta(sigma,T,K,S,R,type = "call"):
     d1 = (np.log(R/K) + 0.5*sigma**2*T)/(sigma*np.sqrt(T))
-    d2 = (np.log(R/K) - 0.5*sigma**2*T)/(sigma*np.sqrt(T))
+    # d2 = (np.log(R/K) - 0.5*sigma**2*T)/(sigma*np.sqrt(T))
     if type == 'call':
-        price = S*(R*ndtr(d1) - K*ndtr(d2))
-        delta = (S/R)*ndtr(d1) - price/R
+        # price = S*(R*ndtr(d1) - K*ndtr(d2))
+        delta = S*ndtr(d1)  # - price/R + S*(R*norm.pdf(d1) - K*norm.pdf(d2))/(R*sigma*np.sqrt(T))
     return delta
 
 def black_swaption_gamma(sigma,T,K,S,R,type = "call"):
