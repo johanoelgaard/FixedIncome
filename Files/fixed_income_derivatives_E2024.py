@@ -55,8 +55,6 @@ def forward_libor_rates_from_zcb_prices(T,p,horizon = 1):
     return f
 
 def accrual_factor_from_zcb_prices(t,T_n,T_N,fixed_freq,T,p):
-    # print(f"inside accrual factor")
-    # print(t,T_n,T_N,fixed_freq,T,p)
     T_fix = []
     if type(fixed_freq) == str:
         if fixed_freq == "quarterly":
@@ -400,7 +398,7 @@ def simul_cir(r0,a,b,sigma,M,T,method = "exact"):
         delta_sqrt = np.sqrt(delta)
         Z = np.random.standard_normal(M)
         for m in range(1,M+1):
-            r_hat = r[m-1] + a*(b-r[m-1])*delta + sigma*np.sqrt(r[m-1])*delta_sqrt*Z[m-1] + 0.5*sigma**2*delta*(Z[m-1]**2-1)
+            r_hat = r[m-1] + a*(b-r[m-1])*delta + sigma*np.sqrt(r[m-1])*delta_sqrt*Z[m-1] + 0.25*sigma**2*delta*(Z[m-1]**2-1)
             if r_hat > 0:
                 r[m] = r_hat
             else:
@@ -628,14 +626,32 @@ def fit_vasicek_no_sigma_obj(param,sigma,R_star,T,scaling = 1):
     return y
 
 # Ho-Lee model
-def theta_ho_lee(t,f_T,sigma):
-    if type(t) == int or type(t) == float or type(t) == np.int32 or type(t) == np.int64 or type(t) == np.float64:
-        theta = f_T + sigma**2*t
-    elif type(t) == tuple or type(t) == list or type(t) == np.ndarray:
-        N = len(t)
-        theta = np.zeros(N)
-        for n in range(0,N):
-            theta[n] = f_T[n] + sigma**2*t[n]
+def theta_ho_lee(t,param,method = "default",f_T = None):
+    if method == "default":
+        sigma = param
+        if type(t) == int or type(t) == float or type(t) == np.int32 or type(t) == np.int64 or type(t) == np.float64:
+            theta = f_T + sigma**2*t
+        elif type(t) == tuple or type(t) == list or type(t) == np.ndarray:
+            N = len(t)
+            theta = np.zeros(N)
+            for n in range(0,N):
+                theta[n] = f_T[n] + sigma**2*t[n]
+    elif method == "nelson_siegel":
+        f_inf, a, b, sigma = param
+        if type(t) == int or type(t) == float or type(t) == np.int32 or type(t) == np.int64 or type(t) == np.float64:
+            K = len(a)
+            theta = -a[0]*b[0]*np.exp(-b[0]*t) + sigma**2*t
+            for k in range(1,K):
+                theta += a[k]*k*t**(k-1)*np.exp(-b[k]*t) - a[k]*b[k]*t**k*np.exp(-b[k]*t)
+        elif type(t) == tuple or type(t) == list or type(t) == np.ndarray:
+            K = len(a)
+            M = len(t)
+            theta = np.zeros([M])
+            for m in range(0,M):
+                theta[m] = -a[0]*b[0]*np.exp(-b[0]*t[m]) + sigma**2*t[m]
+                for k in range(1,K):
+                    theta[m] += a[k]*k*t[m]**(k-1)*np.exp(-b[k]*t[m]) - a[k]*b[k]*t[m]**k*np.exp(-b[k]*t[m])
+
     return theta
 
 def zcb_price_ho_lee(t,T,r,sigma,T_star,p_star,f_star):
@@ -858,6 +874,7 @@ def simul_lmm(L0,T,sigma,rho,M):
         stage += 1
     return np.exp(log_L_simul)
 
+# Swap Market Model
 def simul_smm(R0,T,sigma,rho,M,type = "regular"):
     N = len(R0) - 1
     delta = T[1]*(N+1)/M
@@ -871,22 +888,18 @@ def simul_smm(R0,T,sigma,rho,M,type = "regular"):
     R_simul[:,0] = R0
     stage = 0
     Mps = int(M/(N+1))
-    # print(R0,T,sigma,rho,M,delta,alpha,Mps)
     while stage < N+1:
         Z = np.random.standard_normal([N+1-stage,Mps])
         rho_sqrt = np.real(sqrtm(rho[stage:,stage:]))
-        # print(f"stage; {stage}")
-        # print(rho_sqrt)
         for m in range(1,Mps+1):
             t = delta*(stage*Mps + m - 1)
             alpha[stage] = T[stage+1] - t
             drift = drift_smm(R_simul[stage:,stage*Mps],sigma[stage:,stage:],alpha[stage:])
-            # print(f"    stage: {stage}, m: {m}, t: {t}, alpha: {alpha}")
             R_simul[stage:,stage*Mps + m] = R_simul[stage:,stage*Mps + m-1] + drift*R_simul[stage:,stage*Mps + m-1]*delta + delta_sqrt*R_simul[stage:,stage*Mps + m-1]*np.matmul(sigma[stage:,stage:],Z[:,m-1])
         stage += 1
     return R_simul
 
-def matrix_smm(alpha,R):
+def matrix_swap_to_p(alpha,R):
     N = len(R)
     M = np.zeros([N,N])
     for c in range(0,N):
@@ -899,10 +912,22 @@ def matrix_smm(alpha,R):
         M[r,-1] += 1
     return M
 
+def zcb_prices_from_swap_rates_normal_smm(T,R_swap):
+    N = len(R_swap)
+    alpha = np.zeros(N)
+    p = np.ones(N+1)
+    for n in range(1,N+1):
+        alpha[n-1] = T[n] - T[n-1]
+    X = matrix_swap_to_p(alpha,R_swap)
+    y = np.zeros([N])
+    y[0] = 1
+    p = np.linalg.solve(X,y)
+    return p
+
 def drift_smm(R,sigma,alpha):
     N = len(R) - 1
     drift = np.zeros([N+1])
-    X = matrix_smm(alpha,R)
+    X = matrix_swap_to_p(alpha,R)
     y = np.zeros([N+1])
     y[0] = 1
     p = np.linalg.solve(X,y)
