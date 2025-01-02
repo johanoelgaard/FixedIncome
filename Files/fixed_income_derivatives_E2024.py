@@ -539,7 +539,7 @@ def ci_vasicek(r0,a,b,sigma,T,size_ci,type_ci = "two_sided"):
                 mean = r0*np.exp(-a*T) + b/a*(1-np.exp(-a*T))
                 std = np.sqrt(sigma**2/(2*a)*(1-np.exp(-2*a*T)))
                 lb, ub = mean - z*std, mean + z*std
-        print(f"type_ci: {type_ci}, z: {z}")
+        # print(f"type_ci: {type_ci}, z: {z}")
     elif type(T) == tuple or type(T) == list or type(T) == np.ndarray:
         N = len(T)
         lb, ub = np.zeros([N]), np.zeros([N])
