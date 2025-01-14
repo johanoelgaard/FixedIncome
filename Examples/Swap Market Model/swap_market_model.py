@@ -33,7 +33,7 @@ t_simul = np.array([i*T[-1]/M_simul for i in range(0,M_simul+1)])
 R_simul = fid.simul_smm(R_swap,T,sigma_swaption,rho_swap,M_simul)
 
 fig = plt.figure(constrained_layout=False, dpi = 300, figsize = (5,3))
-fig.suptitle(f"Simulated par swap rates in the Swap Market Model", fontsize = 9)
+fig.suptitle(f"Simulated Swap rates in the Swap Market Model", fontsize = 9)
 gs = fig.add_gridspec(nrows=1,ncols=1,left=0.12,bottom=0.2,right=0.88,top=0.90,wspace=0,hspace=0)
 ax = fig.add_subplot(gs[0,0])
 xticks = np.array([0,1,2,3,4,5])

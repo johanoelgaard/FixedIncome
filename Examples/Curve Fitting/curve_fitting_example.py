@@ -28,13 +28,10 @@ data = EURIBOR_fixing + fra_market + swap_market
 
 # Problem 1 - Fitting the yield curve
 interpolation_options = {"method":"nelson_siegel","transition": "smooth"}
-# interpolation_options = {"method":"hermite","degree":2,"transition": "smooth"}
+interpolation_options = {"method":"hermite","degree":2,"transition": "smooth"}
 T_fit, R_fit = fid.zcb_curve_fit(data,interpolation_options = interpolation_options)
-p_inter, R_inter, f_inter, T_inter = fid.zcb_curve_interpolate(T_fit,R_fit,interpolation_options = interpolation_options,resolution = 1)
 T_6m = np.array([i*0.5 for i in range(0,61)])
-p_6m = np.ones(61)
-p_6m[1:] = fid.for_values_in_list_find_value_return_value(T_6m[1:],T_inter,p_inter)
-f_6m = fid.forward_libor_rates_from_zcb_prices(T_6m,p_6m,horizon = 1)
+p_inter, R_inter, f_inter, T_inter = fid.zcb_curve_interpolate(T_6m,T_fit,R_fit,interpolation_options = interpolation_options)
 
 # c) The par swap rate curve
 T_swap = np.array([i for i in range(1,31)])
@@ -53,7 +50,7 @@ def dv01_swap_spot_rate_bump_fct(t,T_n,T_N,fixed_freq,R_swap_init,T_bump,size_bu
     return DV01
 
 # 2a) DV01 when bumping a single spot rate
-idx_bump_single = 119
+idx_bump_single = 20
 R_bump = R_inter.copy()
 R_bump[idx_bump_single] += size_bump
 p_bump = fid.zcb_prices_from_spot_rates(T_inter,R_bump)
@@ -76,15 +73,15 @@ print(f"DV01 for swap {swap_id} when bumping spot_rates for T: {T_bump} is: {100
 
 # Problem 3 - Bumping market rates and finding the DV01 of a swap
 print(f"Bumping market rates")
-def dv01_market_rate_bump_fct(t,T_n,T_N,fixed_freq,R_swap_init,idx_bump,size_bump,data,interpolation_options):
-    p_bump, R_bump, f_bump, T_bump, data_bump = fid.market_rate_bump(idx_bump,size_bump,data,interpolation_options = interpolation_options,resolution = 1)
+def dv01_market_rate_bump_fct(t,T_n,T_N,T_inter,fixed_freq,R_swap_init,idx_bump,size_bump,data,interpolation_options):
+    p_bump, R_bump, f_bump, T_bump, data_bump = fid.market_rate_bump(idx_bump,size_bump,T_inter,data,interpolation_options = interpolation_options)
     R_swap_bump, S_swap_bump = fid.swap_rate_from_zcb_prices(0,0,T_N,fixed_freq,T_bump,p_bump)
     DV01 = (R_swap_bump-R_swap_init)*S_swap_bump
     return DV01
 
 # DV01 when bumping a single market rate
 idx_bump_single = 15
-p_bump, R_bump, f_bump, T_bump, data_bump = fid.market_rate_bump(idx_bump_single,size_bump,data,interpolation_options = interpolation_options,resolution = 1)
+p_bump, R_bump, f_bump, T_bump, data_bump = fid.market_rate_bump(idx_bump_single,size_bump,T_inter,data,interpolation_options = interpolation_options)
 R_swap_bump, S_swap_bump = fid.swap_rate_from_zcb_prices(0,0,data[swap_id]["maturity"],"annual",T_inter,p_bump)
 print(f"R_swap_bump: {R_swap_bump}, S_swap_bump: {S_swap_bump}")
 DV01 = (R_swap_bump-data[swap_id]["rate"])*S_swap_bump
@@ -93,10 +90,10 @@ print(f"DV01 for swap {swap_id} when bumping market rates for idx: {idx_bump_sin
 idx_bump_all = np.array([i for i in range(0,19)])
 DV01_bump = np.zeros([19])
 for i, idx in enumerate(idx_bump_all):
-    DV01_bump[i] = dv01_market_rate_bump_fct(0,0,data[swap_id]["maturity"],"annual",data[swap_id]["rate"],idx,size_bump,data,interpolation_options)
+    DV01_bump[i] = dv01_market_rate_bump_fct(0,0,data[swap_id]["maturity"],T_inter,"annual",data[swap_id]["rate"],idx,size_bump,data,interpolation_options)
 print(f"DV01 when bumping each market rate separately: {10000*DV01_bump}")
 # DV01 when bumping all of the market rates
-p_bump, R_bump, f_bump, T_bump, data_bump = fid.market_rate_bump(idx_bump_all,size_bump,data,interpolation_options = interpolation_options,resolution = 1)
+p_bump, R_bump, f_bump, T_bump, data_bump = fid.market_rate_bump(idx_bump_all,size_bump,T_inter,data,interpolation_options = interpolation_options)
 R_swap_bump, S_swap_bump = fid.swap_rate_from_zcb_prices(0,0,data[swap_id]["maturity"],"annual",T_inter,p_bump)
 print(f"R_swap_bump: {R_swap_bump}, S_swap_bump: {S_swap_bump}")
 DV01 = (R_swap_bump-data[swap_id]["rate"])*S_swap_bump
@@ -142,6 +139,7 @@ p3 = ax.scatter(T_swap, R_swap, s = 1, color = 'green', marker = ".",label="par 
 plots = [p1,p2,p3]
 labels = [item.get_label() for item in plots]
 ax.legend(plots,labels,loc="lower right",fontsize = 6)
+fig.savefig("C:/Jacob/Uni_of_CPH/FID/FID_E2024/Examples/curve_fit_zcb_fit.pdf")
 plt.show()
 
 fig = plt.figure(constrained_layout=False, dpi = 300, figsize = (5,3))
@@ -165,4 +163,5 @@ p5 = ax.scatter(T_inter, f_vasicek, s = 1, color = 'orange', marker = ".",label=
 plots = [p1,p2,p3,p4,p5]
 labels = [item.get_label() for item in plots]
 ax.legend(plots,labels,loc="lower right",fontsize = 6)
+fig.savefig("C:/Jacob/Uni_of_CPH/FID/FID_E2024/Examples/curve_fit_zcb_fit_vasicek_fit.pdf")
 plt.show()

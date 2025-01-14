@@ -85,7 +85,7 @@ np.random.seed(7)
 r_simul_euler = fid.simul_ho_lee(r0,f_T_simul,sigma,T_simul,method = "euler")        # np.random.seed(7) is good, np.random.seed(4) increases, np.random.seed(3) declines
 np.random.seed(7)
 r_simul_exact = fid.simul_ho_lee(r0,f_T_simul,sigma,T_simul,method = "exact",f=f_simul)     # np.random.seed(1) is good
-theta = fid.theta_ho_lee(t_simul,f_T_simul,sigma)
+theta = fid.theta_ho_lee(t_simul,sigma,method = "default",f_T=f_T_simul)
 mean_ho_lee, var_ho_lee = fid.mean_var_ho_lee(f_simul,sigma,t_simul)
 lb, ub = fid.ci_ho_lee(f_simul,sigma,t_simul,size_ci,type_ci = "two_sided")
 
@@ -131,7 +131,6 @@ p2 = ax.scatter(T, f_inter, s = 1, color = 'red', marker = ".",label="ZCB forwar
 plots = [p1,p2]
 labels = [item.get_label() for item in plots]
 ax.legend(plots,labels,loc="upper right",fontsize = 5)
-# fig.savefig("C:/Jacob/Uni_of_CPH/FID/FID_E2024/Examples/ho_lee_zcb_curve_fit.pdf")
 plt.show()
 
 # PLot of ZCB spot and forward rates as well as fitted Vasicek rates
@@ -155,7 +154,6 @@ p4 = ax.scatter(T_inter, f_vasicek, s = 1, color = 'orange', marker = ".",label=
 plots = [p1,p2,p3,p4]
 labels = [item.get_label() for item in plots]
 ax.legend(plots,labels,loc="lower right",fontsize = 5)
-# fig.savefig("C:/Jacob/Uni_of_CPH/FID/FID_E2024/Examples/ho_lee_zcb_fit_vasicek_fit.pdf")
 plt.show()
 
 # PLot of f and f_T extracted from market data
@@ -177,7 +175,6 @@ p2 = ax.scatter(T, f_T_star, s = 1, color = 'red', marker = ".",label="f*_T")
 plots = [p1,p2]
 labels = [item.get_label() for item in plots]
 ax.legend(plots,labels,loc="upper right",fontsize = 5)
-# fig.savefig("C:/Jacob/Uni_of_CPH/FID/FID_E2024/Examples/ho_lee_f_star.pdf")
 plt.show()
 
 # PLot of simulated short rates in the Ho-Lee model
@@ -205,5 +202,4 @@ p2 = ax.scatter(t_simul, r_simul_exact, s = 1, color = 'blue', marker = ".",labe
 plots = [p1,p2,p3,p4,p5,p6]
 labels = [item.get_label() for item in plots]
 ax.legend(plots,labels,loc="upper right",fontsize = 5)
-# fig.savefig("C:/Jacob/Uni_of_CPH/FID/FID_E2024/Examples/ho_lee_f_star.pdf")
 plt.show()
