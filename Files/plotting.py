@@ -121,7 +121,7 @@ def rates(left_data, right_data=None, title="", text=None,
                 color=color, 
                 alpha=data.get('alpha', 0.75),
                 marker=data.get('marker', '.'),
-                s=data.get('s', 10),
+                s=data.get('s', 15),
                 **data.get('kwargs', {})
             )
         handles.append(plot_)
