@@ -20,7 +20,6 @@ def choos_axis(y_min, y_max):
     else:
         if np.abs(y_min) <= 0.1:
             y_min = round(y_min-0.005,3)-0.005
-            print
         elif np.abs(y_min) <= 0.2:
             y_min = round(y_min-0.005,2)-0.005
         elif np.abs(y_min) <= 0.5:
@@ -54,9 +53,8 @@ def choose_ticks(y_min, y_max, ticks):
     """Choose an appropriate MultipleLocator step dependent on ticks in first axis."""
     y_min= 0
     y_max = (y_max*1.05)//0.1/10+0.1
-
     step = y_max / ticks
-    if y_max < 0.2:
+    if step < 0.1:
         step = round(step, 2)
     else:
         step = round(step, 1)
@@ -64,8 +62,8 @@ def choose_ticks(y_min, y_max, ticks):
     return y_min, y_max, step
 
 def rates(left_data, right_data=None, title="", text=None,
-                  xlabel="Time to Maturity", ylabel="Rates", ylabel_right="Bond Prices",
-                  legend_loc='lower right', text_loc='lower left',
+                  xlabel="Time to Maturity", ylabel="Rate", ylabel_right="Bond Prices",
+                  xrange=None, legend_loc='lower right', text_loc='lower left',
                   figsize=(10, 6), dpi=300, save_fig=False, show_fig=True):
     """
     Plots data on one or two y-axes.
@@ -142,6 +140,9 @@ def rates(left_data, right_data=None, title="", text=None,
 
     ax1.set_xlabel(xlabel)
     ax1.set_ylabel(ylabel)
+
+    if xrange:
+        ax1.set_xlim(xrange[0], xrange[1])
 
     # Plot data on the right axis if provided
     if right_data:
@@ -372,7 +373,7 @@ def histogram(data, bins=100, title="", text=None, theoretical=None, theoretical
 
 def fit(data, residual, title="", text=None, text_res=None, 
         ylabel="Rates", xlabel="Time to Maturity", ylabel_residual="Residuals",
-        legend_loc='upper right', text_loc='lower right', text_res_loc='lower right',
+        xrange=None,legend_loc='upper right', text_loc='lower right', text_res_loc='lower right',
         figsize=(10, 6), dpi=300, save_fig=False, show_fig=True):
     """
     Plots fitted functions alongside original data and displays residuals in a separate subplot.
@@ -581,6 +582,10 @@ def fit(data, residual, title="", text=None, text_res=None,
     
     # Set common x-label
     ax[1].set_xlabel(xlabel)
+
+    if xrange:
+        ax[0].set_xlim(xrange[0], xrange[1])
+        ax[1].set_xlim(xrange[0], xrange[1])
     
     # Set the title for the entire figure
     if title:
