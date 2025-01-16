@@ -15,12 +15,27 @@ plt.rcParams.update({'font.size': 12})
 
 def choos_axis(y_min, y_max):
     """Choose an appropriate MultipleLocator step."""
-    y_min= (y_min*0.95)//0.1/10
-    if y_max <= 0.2:
+    if y_min > 0:
+        y_min= (y_min*0.95)//0.1/10
+    else:
+        if np.abs(y_min) <= 0.1:
+            y_min = round(y_min-0.005,3)-0.005
+            print
+        elif np.abs(y_min) <= 0.2:
+            y_min = round(y_min-0.005,2)-0.005
+        elif np.abs(y_min) <= 0.5:
+            y_min = round(y_min-0.05,1)-0.05
+        elif np.abs(y_min) <= 1:
+            y_min = round(y_min,1)-0.05
+        else:
+            y_min = round(y_min,1)-0.1
+    if np.abs(y_max) <= 0.05:
+        y_max = round(y_max+0.0025,3)+0.0025
+    elif np.abs(y_max) <= 0.25:
         y_max = round(y_max+0.005,2)+0.005
-    elif y_max <= 0.5:
+    elif np.abs(y_max) <= 0.5:
         y_max = round(y_max+0.05,1)+0.05
-    elif y_max <= 1:
+    elif np.abs(y_max) <= 1:
         y_max = round(y_max,1)+0.05
     else:
         y_max = round(y_max,1)+0.1
@@ -28,12 +43,12 @@ def choos_axis(y_min, y_max):
 
     if y_range <= 0:
         return 1  # Default step if range is zero or negative
-    candidates = [0.005, 0.01, 0.02, 0.05, 0.1]
+    candidates = [0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1]
     for step in candidates:
         num_steps = y_range // step
-        if 5 <= num_steps < 10:
+        if 4 <= num_steps < 10:
             return step, y_min, y_max
-    return candidates[1], y_min, y_max # Return step of 0.01 if no suitable step found
+    return candidates[3], y_min, y_max # Return step of 0.01 if no suitable step found
 
 def choose_ticks(y_min, y_max, ticks):
     """Choose an appropriate MultipleLocator step dependent on ticks in first axis."""
