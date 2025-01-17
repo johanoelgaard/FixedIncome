@@ -121,7 +121,7 @@ def rates(left_data, right_data=None, title="", text=None,
                 color=color, 
                 alpha=data.get('alpha', 0.75),
                 marker=data.get('marker', '.'),
-                s=data.get('s', 15),
+                s=data.get('s', 20),
                 **data.get('kwargs', {})
             )
         handles.append(plot_)
@@ -173,7 +173,7 @@ def rates(left_data, right_data=None, title="", text=None,
                     color=color, 
                     alpha=data.get('alpha', 0.75),
                     marker=data.get('marker', '.'),
-                    s=data.get('s', 10),
+                    s=data.get('s',20),
                     **data.get('kwargs', {})
                 )
             handles.append(plot_)
@@ -314,7 +314,7 @@ def histogram(data, bins=100, title="", text=None, theoretical=None, theoretical
             raise ValueError(f"Theoretical distribution '{theoretical}' is not supported.")
         
         # Overlay theoretical distribution
-        ax.scatter(bin_centers, pdf_values, color=color_theoretical, label=label_theoretical, s=5)
+        ax.scatter(bin_centers, pdf_values, color=color_theoretical, label=label_theoretical, s=10)
     
     # Set labels and title
     ax.set_xlabel(xlabel)
