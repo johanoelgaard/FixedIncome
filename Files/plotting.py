@@ -16,7 +16,7 @@ plt.rcParams.update({'font.size': 12})
 def choos_axis(y_min, y_max):
     """Choose an appropriate MultipleLocator step."""
     if y_min > 0:
-        y_min= (y_min*0.95)//0.1/10
+        y_min= (y_min*0.95)//0.1/10 # round to the nearest 0.1 (usually 0.00) when y_min > 0
     else:
         if np.abs(y_min) <= 0.1:
             y_min = round(y_min-0.005,3)-0.005
@@ -63,7 +63,7 @@ def choose_ticks(y_min, y_max, ticks):
 
 def rates(left_data, right_data=None, title="", text=None,
                   xlabel="Time to Maturity", ylabel="Rate", ylabel_right="Bond Prices",
-                  xrange=None, legend_loc='lower right', text_loc='lower left',
+                  xrange=None, yrange=None, yrange_right=None, legend_loc='lower right', text_loc='lower left',
                   figsize=(10, 6), dpi=300, save_fig=False, show_fig=True):
     """
     Plots data on one or two y-axes.
@@ -131,6 +131,10 @@ def rates(left_data, right_data=None, title="", text=None,
         all_y_left = np.concatenate([np.array(data['y'])[~np.isnan(data['y'])] for data in left_data])
         y_min_left, y_max_left = all_y_left.min(), all_y_left.max()
         step_left, y_min_left, y_max_left = choos_axis(y_min_left, y_max_left)
+        if yrange:
+            y_min_left, y_max_left = yrange[0], yrange[1]
+            if len(yrange) == 3:
+                step_left = yrange[2]
         ax1.set_ylim([y_min_left, y_max_left])
         ticks = int((y_max_left-y_min_left)//step_left)
         ax1.yaxis.set_major_locator(MultipleLocator(step_left))
@@ -181,6 +185,8 @@ def rates(left_data, right_data=None, title="", text=None,
         all_y_right = np.concatenate([np.array(data['y'])[~np.isnan(data['y'])] for data in right_data])
         y_min_right, y_max_right = all_y_right.min(), all_y_right.max()
         y_min_right, y_max_right, step_right = choose_ticks(y_min_right, y_max_right, ticks)
+        if yrange_right:
+            y_min_right, y_max_right = yrange_right[0], yrange_right[1]
         # updating y_max_right
         y_max_right = (y_max_left-y_min_right)/step_left*step_right
 
@@ -490,30 +496,30 @@ def fit(data, residual, title="", text=None, text_res=None,
         )
     
     # ------------------ Second Subplot: Residuals ------------------ #
-    residual_handles = []
-    
-    for res_data in residual:
-        label = res_data.get('label', f'Residual {color_idx}')
-        x = res_data['x']
-        y = res_data['y']
-        if 'color' in res_data.keys() and res_data['color'] == 'cycle':
-            color=DEFAULT_COLORS[color_idx % len(DEFAULT_COLORS)]
-            color_idx += 1        
-        elif 'color' in res_data.keys():
-            color = res_data['color']
-        else:
-            color = 'black'
-        alpha = res_data.get('alpha', 0.75)
-        marker = res_data.get('marker', '.')
-        s = res_data.get('s', 20)
-        kwargs = res_data.get('kwargs', {})
+    if residual:
+        residual_handles = []
         
-        plot = ax[1].scatter(x, y, label=label, color=color,
-                             alpha=alpha, marker=marker, s=s, **kwargs)
-        residual_handles.append(plot)
+        for res_data in residual:
+            label = res_data.get('label', f'Residual {color_idx}')
+            x = res_data['x']
+            y = res_data['y']
+            if 'color' in res_data.keys() and res_data['color'] == 'cycle':
+                color=DEFAULT_COLORS[color_idx % len(DEFAULT_COLORS)]
+                color_idx += 1        
+            elif 'color' in res_data.keys():
+                color = res_data['color']
+            else:
+                color = 'black'
+            alpha = res_data.get('alpha', 0.75)
+            marker = res_data.get('marker', '.')
+            s = res_data.get('s', 20)
+            kwargs = res_data.get('kwargs', {})
+            
+            plot = ax[1].scatter(x, y, label=label, color=color,
+                                alpha=alpha, marker=marker, s=s, **kwargs)
+            residual_handles.append(plot)
     
     # Set y-axis locator for the residuals subplot
-    if residual:
         all_res = np.concatenate([np.array(r['y'])[~np.isnan(r['y'])] for r in residual])
         res_min, res_max = all_res.min(), all_res.max()
         res_range = res_max - res_min
@@ -536,6 +542,8 @@ def fit(data, residual, title="", text=None, text_res=None,
         # Add horizontal grid lines
         for tick in ax[1].get_yticks():
             ax[1].axhline(y=tick, color='gray', linestyle='--', linewidth=1)
+        # set y-axis to be scientific notation
+        ax[1].ticklabel_format(axis='y', style='sci', scilimits=(0,0))
     
     ax[1].set_ylabel(ylabel_residual)
     
@@ -545,30 +553,30 @@ def fit(data, residual, title="", text=None, text_res=None,
     
     # Add text box to the residuals subplot if provided
     if text_res:
-        if text_loc == 'upper left':
+        if text_res_loc == 'upper left':
             text_coord = (0.015, 0.95)
             vertalign = 'top'
             horalign = 'left'
-        elif text_loc == 'upper right':
+        elif text_res_loc == 'upper right':
             text_coord = (0.985, 0.95)
             vertalign = 'top'
             horalign = 'right'
-        elif text_loc == 'lower left':
+        elif text_res_loc == 'lower left':
             text_coord = (0.015, 0.05)
             vertalign = 'bottom'
             horalign = 'left'
-        elif text_loc == 'lower right':
+        elif text_res_loc == 'lower right':
             text_coord = (0.985, 0.05)
             vertalign = 'bottom'
             horalign = 'right'
         lines_res = []
-        for key, value in text.items():
+        for key, value in text_res.items():
             if isinstance(value, (list, np.ndarray)):
                     # Format each element in the list/array
-                    value_str = ", ".join([f"{v:.5f}" for v in value])
+                    value_str = ", ".join([f"{v:.5e}" for v in value])
             elif isinstance(value, (float, np.float64, np.float32)):
                     # Format single numerical value
-                    value_str = f"{value:.5f}"
+                    value_str = f"{value:.5e}"
             else:
                 value_str = value
             lines_res.append(f"{key} = {value_str}")
