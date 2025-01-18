@@ -142,18 +142,18 @@ def market_rate_bump(idx_bump,size_bump,T_inter,data,interpolation_options = {"m
     data_bump = copy.deepcopy(data)
     if type(idx_bump) == int or type(idx_bump) == float or type(idx_bump) == np.float64 or type(idx_bump) == np.int32 or type(idx_bump) == np.int64:
         data_bump[idx_bump]["rate"] += size_bump
-        T_fit_bump, R_fit_bump = zcb_curve_fit(data_bump,interpolation_options = interpolation_options)
+        T_fit_bump, R_fit_bump, _ = zcb_curve_fit(data_bump,interpolation_options = interpolation_options)
         p_inter_bump, R_inter_bump, f_inter_bump, T_inter_bump = zcb_curve_interpolate(T_inter,T_fit_bump,R_fit_bump,interpolation_options = interpolation_options)
     elif type(idx_bump) == tuple or type(idx_bump) == list or type(idx_bump) == np.ndarray:
         if type(size_bump) == int or type(size_bump) == float or type(size_bump) == np.float64 or type(size_bump) == np.int32 or type(size_bump) == np.int64:
             for i in range(0,len(idx_bump)):
                 data_bump[idx_bump[i]]["rate"] += size_bump
-            T_fit_bump, R_fit_bump = zcb_curve_fit(data_bump,interpolation_options = interpolation_options)
+            T_fit_bump, R_fit_bump, _ = zcb_curve_fit(data_bump,interpolation_options = interpolation_options)
             p_inter_bump, R_inter_bump, f_inter_bump, T_inter_bump = zcb_curve_interpolate(T_inter,T_fit_bump,R_fit_bump,interpolation_options = interpolation_options)
         elif type(size_bump) == tuple or type(size_bump) == list or type(size_bump) == np.ndarray:
             for i in range(0,len(idx_bump)):
                 data_bump[idx_bump[i]]["rate"] += size_bump[i]
-            T_fit_bump, R_fit_bump = zcb_curve_fit(data_bump,interpolation_options = interpolation_options)
+            T_fit_bump, R_fit_bump, _ = zcb_curve_fit(data_bump,interpolation_options = interpolation_options)
             p_inter_bump, R_inter_bump, f_inter_bump, T_inter_bump = zcb_curve_interpolate(T_inter,T_fit_bump,R_fit_bump,interpolation_options = interpolation_options)
     return p_inter_bump, R_inter_bump, f_inter_bump, T_inter_bump, data_bump
 
@@ -1337,6 +1337,7 @@ def zcb_curve_fit(data_input,interpolation_options = {"method": "linear"},scalin
     args = (T_known,T_knot,T_swap_fit,R_known,swap_data,interpolation_options,1)
     result = minimize(zcb_curve_swap_fit_obj,R_knot_init,method = 'nelder-mead',args = args,options={'xatol': 1e-6,'disp': False})
     T_swap_curve, R_swap_curve = T_known + T_knot, R_known + list(result.x)
+    sse_swap = result.fun
     T_fra_fit = T_swap_curve + T_fra + T_endo
     T_fra_fit.sort()
     R_fra_fit, R_fra_fit_deriv = interpolate(T_fra_fit,T_swap_curve,R_swap_curve,interpolation_options)
@@ -1345,6 +1346,7 @@ def zcb_curve_fit(data_input,interpolation_options = {"method": "linear"},scalin
         R_fra_init[i] = R_fra_fit[value_in_list_returns_I_idx(T_fra[i],T_fra_fit)[1]]
     args = (T_fra,T_known,T_endo,T_fra_fit,R_fra_fit,fra_data,interpolation_options,scaling)
     result = minimize(zcb_curve_fra_fit_obj,R_fra_init,method = 'nelder-mead',args = args,options={'xatol': 1e-6,'disp': False})
+    sse_fra = result.fun
     R_fra = list(result.x)
     R_endo = R_T_endo_from_R_T_fra(R_fra,T_fra,T_endo,fra_data)
     for i in range(0,len(T_fra_fit)):
@@ -1355,7 +1357,7 @@ def zcb_curve_fit(data_input,interpolation_options = {"method": "linear"},scalin
             I_endo, idx_endo = value_in_list_returns_I_idx(T_fra_fit[i],T_endo)
             if I_endo is True:
                 R_fra_fit[i] = R_endo[idx_endo]
-    return np.array(T_fra_fit), np.array(R_fra_fit)
+    return np.array(T_fra_fit), np.array(R_fra_fit), (sse_swap, sse_fra)
 
 def zcb_curve_interpolate(T_inter,T,R,interpolation_options = {"method":"linear"}):
     N = len(T_inter)
