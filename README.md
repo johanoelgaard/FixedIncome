@@ -5,4 +5,4 @@ This repository contains my suggested code for the 6 coding problem sets [`probl
 
 The [`final`](Final) folder contains a [`pdf`](Final/Final.pdf) submitted as the main answer to the exam, this is generated fom the [`notebook`](Final/Final.ipynb) pertaining thereto. Further the [`notebook`](Final/Final.ipynb) has been exported as a raw [`python script`](Final/Final.py) for ease of use. In addition to the main answer the folder contains the custom [`plotting library`](Final/plotting.py) used in the notebook and a slightly modified version of the [`course library`](Final/fixed_income_derivatives_E2024.py) used in the notebook.
 
-All code and the final exam are written by Johan Ølgaard (jlh601@alumni.ku.dk).
+All notebooks and the final exam are written by Johan Ølgaard (jlh601@alumni.ku.dk).
